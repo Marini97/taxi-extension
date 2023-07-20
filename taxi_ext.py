@@ -51,9 +51,6 @@ class TaxiEnv(Env):
             |Y| : |B: |
             +---------+
 
-    From "Hierarchical Reinforcement Learning with the MAXQ Value Function Decomposition"
-    by Tom Dietterich [<a href="#taxi_ref">1</a>].
-
     ## Action Space
     The action shape is `(1,)` in the range `{0, 5}` indicating
     which direction to move the taxi or to pickup/drop off passengers.
@@ -64,6 +61,7 @@ class TaxiEnv(Env):
     - 3: Move west (left)
     - 4: Pickup passenger
     - 5: Drop off passenger
+    - 6: Refuel
 
     ## Observation Space
     There are 500 discrete states since there are 25 taxi positions, 5 possible
@@ -166,7 +164,7 @@ class TaxiEnv(Env):
             self.stations = self.init_fuel_stations()
         else:
             self.stations = stations
-        self.all_fuel_stations = self.init_all_fuel_stations()
+        self.all_fuel_stations = self.get_all_possible_stations()
         self.len_fuel_stations = len(self.all_fuel_stations)
         self.fuel_capacity = 10
         
@@ -182,7 +180,7 @@ class TaxiEnv(Env):
         print("Number of possible passenger locations:", len(locs) + 1)
         print("Number of destinations:", len(locs))
         print("Number of fuel levels:", self.fuel_capacity + 1)
-        print("Number of possible fuel stations locations:", self.len_fuel_stations)
+        print("Number of possible locations for the fuel station:", self.len_fuel_stations)
         print("Total number of states:", num_states)
         print("Number of actions:", num_actions)
         
@@ -192,7 +190,6 @@ class TaxiEnv(Env):
             state: {action: [] for action in range(num_actions)}
             for state in range(num_states)
         }
-        print("Size of dict P in GB:", sys.getsizeof(self.P) / 1_000_000_000)
         
         for row in range(num_rows):
             for col in range(num_columns):
@@ -219,7 +216,7 @@ class TaxiEnv(Env):
                                     elif action == 1:
                                         new_row = max(row - 1, 0)
                                         new_fuel = fuel - 1
-                                    if action == 2 and self.desc[1 + row, 2 * col + 2] == b":":
+                                    elif action == 2 and self.desc[1 + row, 2 * col + 2] == b":":
                                         new_col = min(col + 1, max_col)
                                         new_fuel = fuel - 1
                                     elif action == 3 and self.desc[1 + row, 2 * col] == b":":
@@ -256,6 +253,9 @@ class TaxiEnv(Env):
                                     self.P[state][action].append(
                                         (1.0, new_state, reward, terminated)
                                     )
+                                    
+        print("Size of dict P in GB:", sys.getsizeof(self.P) / 1_000_000_000)
+        
         self.initial_state_distrib /= self.initial_state_distrib.sum()
         self.action_space = spaces.Discrete(num_actions)
         self.observation_space = spaces.Discrete(num_states)
@@ -356,7 +356,7 @@ class TaxiEnv(Env):
         
         return stations
     
-    def init_all_fuel_stations(self):
+    def get_all_possible_stations(self):
         """Return a list of lists of all the posssible fuel stations."""
         
         all_stations = []
@@ -368,8 +368,6 @@ class TaxiEnv(Env):
                     
         return all_stations
         
-        
-    
     def start_fuel_station(self, s):
         """The taxi starts next to a fuel station. The fuel station is chosen randomly.
         The possible actions are:
@@ -410,7 +408,6 @@ class TaxiEnv(Env):
         s = self.encode(taxi_row, taxi_col, pass_loc, dest_idx, fuel_level, station_idx)
         return s
             
-
     def reset(
         self,
         *,
